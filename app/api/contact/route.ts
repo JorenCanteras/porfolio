@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const token = process.env.MAILTRAP_API_TOKEN;
+    const token = process.env.MAILTRAP_API_TOKEN?.trim();
 
     if (!token) {
       console.warn(
@@ -102,9 +102,9 @@ export async function POST(request: Request) {
     });
 
     const fromEmail =
-      process.env.MAILTRAP_FROM_EMAIL ?? "mailtrap@demomailtrap.com";
+      process.env.MAILTRAP_FROM_EMAIL?.trim() ?? "mailtrap@demomailtrap.com";
     const fromName =
-      process.env.MAILTRAP_FROM_NAME ?? "John Rendell Portfolio";
+      process.env.MAILTRAP_FROM_NAME?.trim() ?? "John Rendell Portfolio";
     const { html, text } = buildEmailContent(body);
 
     const response = await client.send({
@@ -135,7 +135,28 @@ export async function POST(request: Request) {
       { status: 200 }
     );
   } catch (error) {
+    const axiosStatus =
+      error &&
+      typeof error === "object" &&
+      "response" in error &&
+      error.response &&
+      typeof error.response === "object" &&
+      "status" in error.response
+        ? Number((error.response as { status: unknown }).status)
+        : undefined;
+
     console.error("[Contact Form]", error);
+
+    if (axiosStatus === 401 || axiosStatus === 403) {
+      return NextResponse.json(
+        {
+          error:
+            "Email service authentication failed. Check MAILTRAP_API_TOKEN on Vercel.",
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
